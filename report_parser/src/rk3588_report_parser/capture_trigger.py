@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Protocol
+from typing import Any, Callable, Dict, Optional
 
 from .paper_detector import PaperDetection
 from .paper_trigger import PaperObservation, PaperStabilityTracker, PaperTrackerUpdate
+from .typing_compat import Protocol
 
 
 class PaperDetectorProtocol(Protocol):

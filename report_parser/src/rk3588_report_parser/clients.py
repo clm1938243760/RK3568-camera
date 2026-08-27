@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import base64
 import json
-from typing import Any, Dict, List, Protocol, Sequence
+from typing import Any, Dict, List, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 
 from .settings import LlmSettings, OcrSettings
+from .typing_compat import Protocol
 
 
 class ServiceError(RuntimeError):

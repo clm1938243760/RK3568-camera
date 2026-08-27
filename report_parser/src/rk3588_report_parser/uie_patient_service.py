@@ -11,7 +11,7 @@ import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Mapping, Optional, Protocol, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
@@ -25,6 +25,7 @@ from .uie_extraction import (
     run_uie_extraction,
     uie_prompts,
 )
+from .typing_compat import Protocol
 
 
 MAX_CAPTURE_JSON_BYTES = 5 * 1024 * 1024

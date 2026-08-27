@@ -32,6 +32,7 @@ PRODUCTION_FILES = (
     "report_parser/src/rk3588_report_parser/preprocessing.py",
     "report_parser/src/rk3588_report_parser/settings.py",
     "report_parser/src/rk3588_report_parser/spans.py",
+    "report_parser/src/rk3588_report_parser/typing_compat.py",
 )
 
 

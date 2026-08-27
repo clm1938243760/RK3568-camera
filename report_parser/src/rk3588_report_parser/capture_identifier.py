@@ -6,12 +6,13 @@ import json
 import time
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Dict, Optional, Protocol
+from typing import Any, Dict, Optional
 
 from .capture_text import CapturedTextDocument, build_captured_text_document
 from .identifier_pipeline import IdentifierParseOutcome, IdentifierParser
 from .identifier_rules import parse_identifier_rule_settings, uses_character_count_only
 from .settings import ParserSettings, load_settings, with_endpoint_overrides
+from .typing_compat import Protocol
 
 
 class IdentifierParserProtocol(Protocol):

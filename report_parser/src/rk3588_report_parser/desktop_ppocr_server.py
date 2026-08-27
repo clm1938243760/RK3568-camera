@@ -8,9 +8,11 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Protocol, Sequence, Tuple, Type
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Type
 
 from PIL import Image
+
+from .typing_compat import Protocol
 
 
 class DesktopOcrRuntimeError(RuntimeError):

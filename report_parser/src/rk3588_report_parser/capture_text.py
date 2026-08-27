@@ -7,13 +7,14 @@ import math
 import statistics
 import time
 from dataclasses import dataclass, field, replace
-from typing import Any, Callable, Dict, List, Optional, Protocol, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from PIL import Image, ImageOps
 
 from .models import OcrSpan, average_score
 from .settings import OcrSettings
 from .spans import build_spans
+from .typing_compat import Protocol
 
 
 class FullTextOcrClientProtocol(Protocol):

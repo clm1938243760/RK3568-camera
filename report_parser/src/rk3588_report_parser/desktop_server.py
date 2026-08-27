@@ -6,7 +6,9 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, Sequence, Tuple, Type
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Type
+
+from .typing_compat import Protocol
 
 
 class DesktopRuntimeError(RuntimeError):

@@ -79,6 +79,19 @@ class RuntimeContractTests(unittest.TestCase):
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
 
+    def test_parser_protocol_types_use_python37_compatibility_layer(self):
+        package = ROOT / "report_parser" / "src" / "rk3588_report_parser"
+        for path in package.glob("*.py"):
+            if path.name == "typing_compat.py":
+                continue
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if line.startswith("from typing import"):
+                    self.assertNotIn("Protocol", line, str(path))
+
+        compat = (package / "typing_compat.py").read_text(encoding="utf-8")
+        self.assertIn("from typing import Protocol", compat)
+        self.assertIn("class Protocol(object)", compat)
+
     def test_rk3568_python_runtime_versions_are_pinned(self):
         requirements = (
             ROOT / "report_parser" / "requirements-camera-trigger-board.txt"
