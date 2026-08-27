@@ -54,6 +54,8 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertEqual(manifest["platform"], "rk3568")
         self.assertEqual(manifest["status"], "unverified")
         self.assertEqual(manifest["ppocr"]["recognition_execution"]["parallel_contexts"], 1)
+        self.assertEqual(manifest["deployment"]["detector_backend"], "onnxruntime")
+        self.assertEqual(manifest["paper_detector"]["backend"], "onnxruntime_cpu")
 
     def test_monitor_uses_rk3568_jpeg_preview_instead_of_rk3588_webrtc(self):
         monitor = (ROOT / "camera_ocr_overlay.py").read_text(encoding="utf-8")
@@ -74,6 +76,15 @@ class RuntimeContractTests(unittest.TestCase):
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_rk3568_python_runtime_versions_are_pinned(self):
+        requirements = (
+            ROOT / "report_parser" / "requirements-camera-trigger-board.txt"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("numpy==1.21.6", requirements)
+        self.assertIn("onnxruntime==1.14.0", requirements)
+        self.assertNotIn("1.17.3", requirements)
 
 
 if __name__ == "__main__":

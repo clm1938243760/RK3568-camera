@@ -50,6 +50,7 @@ section "python modules"
 run_optional python3 -c 'import sys; print("python=%s" % sys.version.replace("\n", " "))'
 run_optional python3 -c 'import cv2; print("opencv=%s" % cv2.__version__)'
 run_optional python3 -c 'import numpy; print("numpy=%s" % numpy.__version__)'
+run_optional python3 -c 'import onnxruntime; print("onnxruntime=%s" % onnxruntime.__version__)'
 run_optional python3 -c 'import PIL; print("pillow=%s" % PIL.__version__)'
 
 section "runtime files"

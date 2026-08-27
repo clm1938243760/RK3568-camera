@@ -29,7 +29,7 @@ class CameraRuntimeManifestTests(unittest.TestCase):
         model = ROOT / detector["path"]
 
         self.assertEqual(hashlib.sha256(model.read_bytes()).hexdigest(), detector["sha256"])
-        self.assertEqual(detector["backend"], "opencv_dnn_cpu")
+        self.assertEqual(detector["backend"], "onnxruntime_cpu")
         self.assertNotIn("benchmark", detector)
 
     def test_service_keeps_the_rk3588_comparison_parameters(self) -> None:
@@ -41,7 +41,8 @@ class CameraRuntimeManifestTests(unittest.TestCase):
         self.assertIn("--stable-seconds ${STABLE_SECONDS}", unit)
         self.assertIn("--burst-frames ${BURST_FRAMES}", unit)
         self.assertIn("--ocr-document-long-side ${OCR_DOCUMENT_LONG_SIDE}", unit)
-        self.assertIn("--detector-backend opencv", unit)
+        self.assertIn("Environment=DETECTOR_BACKEND=onnxruntime", unit)
+        self.assertIn("--detector-backend ${DETECTOR_BACKEND}", unit)
         self.assertEqual(self.manifest["deployment"]["stable_seconds"], 0.5)
         self.assertEqual(self.manifest["deployment"]["burst_frames"], 2)
         self.assertEqual(self.manifest["deployment"]["ocr_document_long_side"], 3200)

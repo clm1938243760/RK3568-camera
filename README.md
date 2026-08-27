@@ -4,25 +4,25 @@
 ATK-DLRK3568 上复现相同的纸张检测、两帧选优、透视校正和全文 OCR，再用同一
 样本和同一参数测出与 RK3588 的真实耗时差。
 
-当前状态是“迁移准备完成，等待 RK3568 真机验证”，不是已经完成性能验收。
+当前状态是“已完成板端依赖准备，等待 RK3568 真机识别验证”，不是已经完成性能验收。
 
 ## 基线来源
 
 - 上层识别代码来自 RK3588-camera 提交
   795c0c76e3ea065366f0478e47862cb4704326a3。
-- DocAligner 模型及其 SHA-256 保持不变，在 RK3568 上使用 OpenCV DNN CPU。
+- DocAligner 模型及其 SHA-256 保持不变，在 RK3568 上使用 ONNX Runtime CPU。
 - RK3568 已有 rk3568-ppocr.service，HTTP 契约为
   POST http://127.0.0.1:5002/ocr。
 - 已知帧服务为 rk3568-patient-frame.service，默认接口为
   http://127.0.0.1:8090/api/frame.jpg?quality=95。
-- 当前已知 /dev/video9 是 1280x720 MJPEG 采集来源。它是否就是本次纸张
-  摄像头必须在预检时重新确认，不能直接假设。
+- 预检已确认 `/dev/video9` 和 `/dev/video10` 属于 USB Composite Camera，
+  现有帧服务实际使用 `/dev/video9`，输出 1280x720 MJPEG，约 25.74 FPS。
 
 ## 数据链路
 
     RK3568 帧服务 :8090
       -> HTTP JPEG 快照桥接，5 FPS 原子轮转文件
-      -> DocAligner OpenCV DNN 纸张检测
+      -> DocAligner ONNX Runtime CPU 纸张检测
       -> 稳定 0.5 秒
       -> 连续采集 2 帧并选择最佳画面
       -> 透视校正，目标长边 3200
@@ -57,6 +57,7 @@ ATK-DLRK3568 上复现相同的纸张检测、两帧选优、透视校正和全�
 
 安装文件但不启用、不启动服务：
 
+    sudo apt-get install -y python3-opencv python3-numpy
     sudo bash install.sh --bootstrap-python
 
 确认 /var/lib/rk3568-camera/camera.env 中的帧接口、方向和裁剪范围后再激活：
@@ -65,6 +66,8 @@ ATK-DLRK3568 上复现相同的纸张检测、两帧选优、透视校正和全�
 
 安装器不会修改或重启既有的帧服务、PP-OCR、网关、USB gadget、打印或
 MSC 服务。监看页使用 http://BOARD_IP:8894/，不会占用 RK3588 的 8893。
+Debian 的 OpenCV 3.2 负责 JPEG 和图像处理；固定版本的 ONNX Runtime 1.14.0
+负责 DocAligner 推理，因此不依赖 OpenCV 的 ONNX DNN 支持。
 
 ## 性能比较
 

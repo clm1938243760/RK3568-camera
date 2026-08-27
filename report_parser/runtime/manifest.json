@@ -15,7 +15,7 @@
     "ocr_total_budget_seconds": 10,
     "ocr_rotation": 90,
     "ocr_document_long_side": 3200,
-    "detector_backend": "opencv",
+      "detector_backend": "onnxruntime",
     "ocr_tiling": {
       "enabled": false,
       "max_aspect": 0.0,
@@ -48,12 +48,13 @@
     "reported_format": "MJPEG",
     "reported_size": [1280, 720],
     "adapter": "scripts/rk3568_snapshot_bridge.py",
-    "status": "must_be_revalidated_with_the_paper_camera"
+    "device_name": "USB Composite Device: USB Camera",
+    "status": "verified_by_rk3568_preflight_20260827"
   },
   "paper_detector": {
     "name": "DocAligner point regression lcnet050",
     "format": "onnx",
-    "backend": "opencv_dnn_cpu",
+    "backend": "onnxruntime_cpu",
     "path": "runtime/docaligner/lcnet050_p_multi_decoder_l3_d64_256_fp32.onnx",
     "sha256": "32d186080ce16442674d4c0eaaaaac878eea289b56a8d1284f05fff1ff42e220",
     "status": "artifact_locked_rk3568_benchmark_pending"

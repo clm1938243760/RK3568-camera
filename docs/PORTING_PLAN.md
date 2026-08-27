@@ -12,8 +12,8 @@
 | 系统 | Debian 10、Linux 4.19.232、Python 3.7.3 | 生产子集保持 Python 3.7 语法和 API 兼容 |
 | NPU | fde40000.npu | 只调用现有 RK3568 PP-OCR，不复制 RK3588 runtime |
 | OCR | rk3568-ppocr.service，端口 5002 | 保持 /health 和 /ocr 协议 |
-| 图像 | 已有 8090 HTTP JPEG，当前记录为 /dev/video9 1280x720 MJPEG | 用快照桥接隔离具体 V4L2 节点 |
-| 纸张检测 | DocAligner ONNX | RK3568 使用 OpenCV DNN CPU |
+| 图像 | USB Composite Camera，经 8090 HTTP JPEG 输出；帧服务使用 /dev/video9，1280x720 MJPEG | 用快照桥接隔离具体 V4L2 节点 |
+| 纸张检测 | DocAligner ONNX | RK3568 使用 ONNX Runtime CPU；OpenCV 仅做图像处理 |
 
 ## 不允许直接复制
 
@@ -26,8 +26,8 @@
 
 ### A. 只读预检
 
-运行 scripts/rk3568_preflight.sh，确认实际摄像头节点、格式、分辨率、NPU
-频率节点、OpenCV/Numpy/Pillow 和两个现有 HTTP 服务。此阶段不启动新服务。
+运行 scripts/rk3568_preflight.sh，确认实际 USB 摄像头节点、格式、分辨率、NPU
+频率节点、OpenCV/Numpy/ONNX Runtime/Pillow 和两个现有 HTTP 服务。此阶段不启动新服务。
 
 ### B. 固定样本基准
 

@@ -11,7 +11,8 @@ usage() {
   cat <<'EOF'
 Usage: sudo bash install.sh [--bootstrap-python] [--activate]
 
-  --bootstrap-python  Create the Python 3.7 system-site virtual environment.
+  --bootstrap-python  Create the Python 3.7 system-site virtual environment
+                      and install pinned ARM64 NumPy/ONNX Runtime wheels.
   --activate          Enable and restart only the three rk3568-camera services.
 
 The existing frame, PP-OCR, gateway, and USB gadget services are not modified.
@@ -75,7 +76,14 @@ if [[ ! -x "$TARGET_DIR/.venv-camera/bin/python" ]]; then
   python3 -m venv --system-site-packages "$TARGET_DIR/.venv-camera"
 fi
 
-"$TARGET_DIR/.venv-camera/bin/python" -c 'import cv2, numpy; from PIL import Image; print("RK3568 camera Python dependencies OK")'
+if [[ "$BOOTSTRAP_PYTHON" -eq 1 ]]; then
+  "$TARGET_DIR/.venv-camera/bin/python" -m pip install --upgrade "pip<24.1"
+  "$TARGET_DIR/.venv-camera/bin/python" -m pip install --only-binary=:all: \
+    -r "$SOURCE_DIR/report_parser/requirements-camera-trigger-board.txt"
+fi
+
+"$TARGET_DIR/.venv-camera/bin/python" -c 'import cv2, numpy, onnxruntime; from PIL import Image; print("RK3568 camera Python dependencies OK: cv2=%s numpy=%s onnxruntime=%s" % (cv2.__version__, numpy.__version__, onnxruntime.__version__))'
+RK3568_CAMERA_TARGET="$TARGET_DIR" PYTHONPATH="$TARGET_DIR/report_parser/src" "$TARGET_DIR/.venv-camera/bin/python" -c 'import os; from pathlib import Path; from rk3588_report_parser.paper_detector import DocAlignerOnnxRuntimeDetector; model = Path(os.environ["RK3568_CAMERA_TARGET"]) / "report_parser/runtime/docaligner/lcnet050_p_multi_decoder_l3_d64_256_fp32.onnx"; detector = DocAlignerOnnxRuntimeDetector(model); print("RK3568 DocAligner model loaded in %.2f ms" % detector.model_load_ms)'
 
 units=(
   rk3568-camera-snapshot-bridge.service
