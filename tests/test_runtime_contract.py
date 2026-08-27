@@ -43,6 +43,8 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertNotIn("Wants=network-online.target rk3568-patient-frame", snapshot_unit)
         self.assertNotIn("Wants=network-online.target rk3568-ppocr", trigger_unit)
         self.assertNotIn("Wants=network-online.target rk3568-camera-report-trigger", monitor_unit)
+        self.assertIn("/tmp/rk3568_camera_ocr_%%d.jpg", snapshot_unit)
+        self.assertNotIn("/tmp/rk3568_camera_ocr_%d.jpg", snapshot_unit)
 
     def test_manifest_is_rk3568_and_not_claimed_verified(self):
         manifest = json.loads(
