@@ -1,0 +1,26 @@
+[Unit]
+Description=RK3568 camera HTTP JPEG snapshot bridge
+After=network-online.target rk3568-patient-frame.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/rk3568_camera
+Environment=FRAME_ENDPOINT=http://127.0.0.1:8090/api/frame.jpg?quality=95
+Environment=FRAME_FPS=5
+Environment=SNAPSHOT_SLOTS=4
+Environment=SNAPSHOT_MINIMUM_BYTES=4096
+EnvironmentFile=-/var/lib/rk3568-camera/camera.env
+ExecStart=/opt/rk3568_camera/.venv-camera/bin/python /opt/rk3568_camera/scripts/rk3568_snapshot_bridge.py --endpoint ${FRAME_ENDPOINT} --fps ${FRAME_FPS} --slots ${SNAPSHOT_SLOTS} --minimum-bytes ${SNAPSHOT_MINIMUM_BYTES} --output-pattern /tmp/rk3568_camera_ocr_%d.jpg --status-file /run/rk3568-camera/snapshot-bridge.json
+Restart=always
+RestartSec=2
+RuntimeDirectory=rk3568-camera
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+PrivateTmp=false
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

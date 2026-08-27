@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "status": "unverified",
+  "platform": "rk3568",
+  "active_mode": "camera_text_only_v2_port",
+  "source": {
+    "repository": "RK3588-camera",
+    "commit": "795c0c76e3ea065366f0478e47862cb4704326a3",
+    "reference_manifest": "runtime/manifest.rk3588-reference.json"
+  },
+  "deployment": {
+    "status": "port_prepared_not_board_verified",
+    "stable_seconds": 0.5,
+    "burst_frames": 2,
+    "ocr_total_budget_seconds": 10,
+    "ocr_rotation": 90,
+    "ocr_document_long_side": 3200,
+    "detector_backend": "opencv",
+    "ocr_tiling": {
+      "enabled": false,
+      "max_aspect": 0.0,
+      "overlap_ratio": 0.15,
+      "max_tiles": 4
+    },
+    "ocr_document_region": {
+      "enabled": true,
+      "coordinate_space": "rectified_document_normalized",
+      "crop_normalized": [0, 130, 1000, 600],
+      "accept_normalized": [0, 130, 1000, 600]
+    },
+    "ocr_refinement": {
+      "max_regions": 0,
+      "empty_primary_second_frame_retry": true
+    }
+  },
+  "board_baseline": {
+    "board": "ATK-DLRK3568",
+    "os": "Debian 10",
+    "kernel": "4.19.232",
+    "python": "3.7.3",
+    "npu_devfreq": "/sys/class/devfreq/fde40000.npu",
+    "status": "observed_by_existing_patient_ocr_project"
+  },
+  "frame_source": {
+    "service": "rk3568-patient-frame.service",
+    "endpoint": "http://127.0.0.1:8090/api/frame.jpg?quality=95",
+    "reported_device": "/dev/video9",
+    "reported_format": "MJPEG",
+    "reported_size": [1280, 720],
+    "adapter": "scripts/rk3568_snapshot_bridge.py",
+    "status": "must_be_revalidated_with_the_paper_camera"
+  },
+  "paper_detector": {
+    "name": "DocAligner point regression lcnet050",
+    "format": "onnx",
+    "backend": "opencv_dnn_cpu",
+    "path": "runtime/docaligner/lcnet050_p_multi_decoder_l3_d64_256_fp32.onnx",
+    "sha256": "32d186080ce16442674d4c0eaaaaac878eea289b56a8d1284f05fff1ff42e220",
+    "status": "artifact_locked_rk3568_benchmark_pending"
+  },
+  "ppocr": {
+    "service": "rk3568-ppocr.service",
+    "endpoint": "http://127.0.0.1:5002/ocr",
+    "target_platform": "rk3568",
+    "det_model_sha256": "dd6847dd49a31cd69cd0ec163c57bedeabf3336d2eba1e5f135e8c121d4f5724",
+    "rec_model_sha256": "0a85cf3f6820688b3713f7e51730d259583f5dc9cfe995f244aef347bd0482e0",
+    "recognition_execution": {
+      "parallel_contexts": 1,
+      "strategy": "serialized_existing_service",
+      "benchmark": null
+    },
+    "status": "existing_service_contract_known_runtime_revalidation_required"
+  },
+  "benchmark": {
+    "fixed_fixture": null,
+    "live_end_to_end": null,
+    "rk3588_comparison": null
+  }
+}

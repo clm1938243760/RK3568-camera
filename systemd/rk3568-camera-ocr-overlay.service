@@ -1,0 +1,22 @@
+[Unit]
+Description=RK3568 report capture monitor web service
+After=network-online.target rk3568-camera-report-trigger.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/rk3568_camera
+Environment=FRAME_ENDPOINT=http://127.0.0.1:8090/api/frame.jpg?quality=95
+EnvironmentFile=-/var/lib/rk3568-camera/camera.env
+ExecStart=/opt/rk3568_camera/.venv-camera/bin/python /opt/rk3568_camera/camera_ocr_overlay.py --text-only --host 0.0.0.0 --port 8894 --frame-endpoint ${FRAME_ENDPOINT} --display-rotation 90 --status-file /run/rk3568-camera/camera-trigger.json --result-file /run/rk3568-camera/verified-identifier.json --full-text-result-file /run/rk3568-camera/verified-full-text.json --rules-file /var/lib/rk3568-camera/active_identifier_rules.json --capture-settings-file /var/lib/rk3568-camera/camera_capture_settings.json --trigger-environment-file /var/lib/rk3568-camera/camera.env --trigger-service rk3568-camera-report-trigger.service
+Restart=always
+RestartSec=2
+RuntimeDirectory=rk3568-camera
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
