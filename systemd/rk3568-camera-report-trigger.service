@@ -16,10 +16,14 @@ Environment=OCR_ROTATION=90
 Environment=OCR_REGION_TOP=0.13
 Environment=OCR_REGION_BOTTOM=0.60
 Environment=OCR_DOCUMENT_LONG_SIDE=3200
+Environment=OCR_TILE_MAX_ASPECT=2.0
+Environment=OCR_TILE_OVERLAP_RATIO=0.15
+Environment=OCR_TILE_MAX_COUNT=2
+Environment=OCR_REFINEMENT_MAX_REGIONS=0
 Environment=STABLE_SECONDS=0.5
 Environment=BURST_FRAMES=2
 EnvironmentFile=-/var/lib/rk3568-camera/camera.env
-ExecStart=/opt/rk3568_camera/.venv-camera/bin/python /opt/rk3568_camera/report_parser/scripts/camera_paper_trigger.py --text-only --frame-glob /tmp/rk3568_camera_ocr_*.jpg --paper-model /opt/rk3568_camera/report_parser/runtime/docaligner/lcnet050_p_multi_decoder_l3_d64_256_fp32.onnx --detector-backend ${DETECTOR_BACKEND} --ocr-endpoint ${OCR_ENDPOINT} --ocr-rotation ${OCR_ROTATION} --ocr-document-long-side ${OCR_DOCUMENT_LONG_SIDE} --ocr-tile-max-aspect 0 --ocr-tile-overlap-ratio 0.15 --ocr-tile-max-count 4 --ocr-refinement-max-regions 0 --ocr-region-crop-top ${OCR_REGION_TOP} --ocr-region-crop-bottom ${OCR_REGION_BOTTOM} --ocr-region-accept-top ${OCR_REGION_TOP} --ocr-region-accept-bottom ${OCR_REGION_BOTTOM} --burst-frames ${BURST_FRAMES} --ocr-total-budget 10 --stable-seconds ${STABLE_SECONDS} --config /opt/rk3568_camera/report_parser/config.rk3568.ocr_only.json --rules-file /var/lib/rk3568-camera/active_identifier_rules.json --status-file /run/rk3568-camera/camera-trigger.json --result-file /run/rk3568-camera/verified-identifier.json --full-text-result-file /run/rk3568-camera/verified-full-text.json --configuration-image-dir /run/rk3568-camera/configuration-images
+ExecStart=/opt/rk3568_camera/.venv-camera/bin/python /opt/rk3568_camera/report_parser/scripts/camera_paper_trigger.py --text-only --frame-glob /tmp/rk3568_camera_ocr_*.jpg --paper-model /opt/rk3568_camera/report_parser/runtime/docaligner/lcnet050_p_multi_decoder_l3_d64_256_fp32.onnx --detector-backend ${DETECTOR_BACKEND} --ocr-endpoint ${OCR_ENDPOINT} --ocr-rotation ${OCR_ROTATION} --ocr-document-long-side ${OCR_DOCUMENT_LONG_SIDE} --ocr-tile-max-aspect ${OCR_TILE_MAX_ASPECT} --ocr-tile-overlap-ratio ${OCR_TILE_OVERLAP_RATIO} --ocr-tile-max-count ${OCR_TILE_MAX_COUNT} --ocr-refinement-max-regions ${OCR_REFINEMENT_MAX_REGIONS} --ocr-region-crop-top ${OCR_REGION_TOP} --ocr-region-crop-bottom ${OCR_REGION_BOTTOM} --ocr-region-accept-top ${OCR_REGION_TOP} --ocr-region-accept-bottom ${OCR_REGION_BOTTOM} --burst-frames ${BURST_FRAMES} --ocr-total-budget 10 --stable-seconds ${STABLE_SECONDS} --config /opt/rk3568_camera/report_parser/config.rk3568.ocr_only.json --rules-file /var/lib/rk3568-camera/active_identifier_rules.json --status-file /run/rk3568-camera/camera-trigger.json --result-file /run/rk3568-camera/verified-identifier.json --full-text-result-file /run/rk3568-camera/verified-full-text.json --configuration-image-dir /run/rk3568-camera/configuration-images
 Restart=on-failure
 RestartSec=2
 TimeoutStopSec=10

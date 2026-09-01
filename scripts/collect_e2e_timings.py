@@ -5,7 +5,6 @@ from __future__ import print_function
 
 import argparse
 import json
-import math
 import statistics
 import time
 from pathlib import Path
@@ -13,10 +12,19 @@ from pathlib import Path
 
 TIMING_KEYS = (
     "paper_to_result_ms",
-    "burst_capture_ms",
-    "primary_ocr_ms",
-    "secondary_full_ocr_ms",
-    "refinement_ocr_ms",
+    "stability_ms",
+    "quality_ms",
+    "crop_ms",
+    "transform_ms",
+    "ocr_ms",
+    "ocr_detection_ms",
+    "ocr_crop_ms",
+    "ocr_recognition_preprocess_ms",
+    "ocr_recognition_inference_ms",
+    "ocr_recognition_postprocess_ms",
+    "structured_ms",
+    "post_stable_ms",
+    "paper_to_ocr_ms",
     "total_ms",
 )
 
@@ -29,19 +37,6 @@ def read_json(path):
     return payload if isinstance(payload, dict) else None
 
 
-def percentile(values, percentile_value):
-    ordered = sorted(float(value) for value in values)
-    if not ordered:
-        return None
-    if len(ordered) == 1:
-        return ordered[0]
-    position = (len(ordered) - 1) * float(percentile_value) / 100.0
-    lower = int(math.floor(position))
-    upper = int(math.ceil(position))
-    fraction = position - lower
-    return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
-
-
 def summarize(values):
     if not values:
         return None
@@ -50,7 +45,6 @@ def summarize(values):
         "min": round(min(values), 2),
         "mean": round(statistics.mean(values), 2),
         "median": round(statistics.median(values), 2),
-        "p95": round(percentile(values, 95), 2),
         "max": round(max(values), 2),
     }
 
@@ -64,7 +58,15 @@ class TimingCollector(object):
         self.records = []
 
     def observe_status(self, payload):
-        now = float(payload.get("updated_at") or time.time())
+        updated_at_ms = payload.get("updated_at_ms")
+        now = float(
+            payload.get("updated_at")
+            or (
+                float(updated_at_ms) / 1000.0
+                if isinstance(updated_at_ms, (int, float))
+                else time.time()
+            )
+        )
         detected = bool(payload.get("paper_detected"))
         if detected and self.paper_started_at is None:
             self.paper_started_at = now
@@ -93,9 +95,8 @@ class TimingCollector(object):
                 if paper_started is not None
                 else None
             ),
-            "line_count": int(((payload.get("document") or {}).get("line_count") or 0)),
-            "item_count": int(((payload.get("document") or {}).get("item_count") or 0)),
-            "ocr_call_count": int(round(float(timings.get("ocr_call_count") or 0))),
+            "field_count": len(payload.get("fields") or {}),
+            "ocr_item_count": int(((payload.get("source") or {}).get("ocr_item_count") or 0)),
         }
         for key, value in timings.items():
             if isinstance(value, (int, float)):
@@ -145,7 +146,7 @@ def parse_args():
     parser.add_argument(
         "--result-file",
         type=Path,
-        default=Path("/run/rk3568-camera/verified-full-text.json"),
+        default=Path("/run/rk3568-camera/structured-result.json"),
     )
     parser.add_argument("--board-label", required=True)
     parser.add_argument("--samples", type=int, default=10)

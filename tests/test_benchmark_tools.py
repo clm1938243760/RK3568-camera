@@ -54,18 +54,16 @@ class BenchmarkToolTests(unittest.TestCase):
                 {
                     "capture_id": "capture-a",
                     "status": "accepted",
-                    "timings": {"primary_ocr_ms": 800.0, "total_ms": 1200.0},
-                    "document": {
-                        "line_count": 5,
-                        "item_count": 10,
-                        "full_text": "must not be retained",
-                    },
+                    "timings": {"ocr_ms": 800.0, "total_ms": 1200.0},
+                    "source": {"ocr_item_count": 10},
+                    "fields": {"patient_id": {"value": "must not be retained"}},
                 }
             )
 
         self.assertEqual(record["paper_to_result_ms"], 2000.0)
-        self.assertEqual(record["primary_ocr_ms"], 800.0)
-        self.assertNotIn("full_text", str(collector.output()))
+        self.assertEqual(record["ocr_ms"], 800.0)
+        self.assertNotIn("must not be retained", str(collector.output()))
+        self.assertNotIn("p95", collector.output()["summary"]["total_ms"])
 
 
 if __name__ == "__main__":

@@ -1,0 +1,26 @@
+[Unit]
+Description=RK3568 native NV12 RGA RKNN report recognition pipeline
+After=local-fs.target rk3568-camera-native-structured.service rk3568-camera-native-preview.service
+Wants=rk3568-camera-native-preview.service
+Requires=rk3568-camera-native-structured.service
+Conflicts=rk3568-camera-report-trigger.service rk3568-camera-snapshot-bridge.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/rk3568_camera
+EnvironmentFile=/var/lib/rk3568-camera/native.env
+EnvironmentFile=-/var/lib/rk3568-camera/camera.env
+ExecStart=/opt/rk3568_camera/bin/rk3568_native_pipeline_service ${DOCALIGNER_MODEL} ${PPOCR_DET_MODEL} ${PPOCR_REC_MODEL} ${VIDEO_DEVICE} ${NATIVE_STATUS_FILE} ${NATIVE_OCR_FILE} ${STRUCTURED_SOCKET}
+ExecStopPost=/bin/sh /opt/rk3568_camera/scripts/reset_npu_min_frequency.sh
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=10
+RuntimeDirectory=rk3568-camera
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+LimitCORE=0
+
+[Install]
+WantedBy=multi-user.target

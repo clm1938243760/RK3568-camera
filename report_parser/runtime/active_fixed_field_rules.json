@@ -8,7 +8,7 @@
       "fixed_length": 0,
       "min_ocr_score": 0.65,
       "max_distance": 180,
-      "required": false
+      "required": true
     },
     {
       "field_key": "patient_id",
@@ -18,7 +18,7 @@
       "fixed_length": 0,
       "min_ocr_score": 0.65,
       "max_distance": 180,
-      "required": false
+      "required": true
     },
     {
       "field_key": "his_exam_no",

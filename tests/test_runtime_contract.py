@@ -46,6 +46,16 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertIn("/tmp/rk3568_camera_ocr_%%d.jpg", snapshot_unit)
         self.assertNotIn("/tmp/rk3568_camera_ocr_%d.jpg", snapshot_unit)
 
+    def test_native_installer_has_safe_activation_and_single_job_default(self):
+        script = (ROOT / "scripts" / "install_native_pipeline.sh").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('NATIVE_BUILD_JOBS="${NATIVE_BUILD_JOBS:-1}"', script)
+        self.assertIn("restore_previous_pipeline", script)
+        self.assertIn("Native activation failed", script)
+        self.assertNotIn("rm -rf /etc/systemd/system", script)
+
     def test_manifest_is_rk3568_and_not_claimed_verified(self):
         manifest = json.loads(
             (ROOT / "report_parser" / "runtime" / "manifest.json").read_text(

@@ -20,13 +20,15 @@ def nested(payload, path):
 def metric_rows(rk3588, rk3568):
     candidates = (
         ("OCR HTTP client median", "metrics.client_elapsed_ms.median"),
-        ("OCR HTTP client p95", "metrics.client_elapsed_ms.p95"),
         ("OCR server median", "metrics.server_elapsed_ms.median"),
-        ("OCR server p95", "metrics.server_elapsed_ms.p95"),
         ("Paper to result median", "summary.paper_to_result_ms.median"),
         ("Pipeline total median", "summary.total_ms.median"),
-        ("Burst capture median", "summary.burst_capture_ms.median"),
-        ("Primary OCR median", "summary.primary_ocr_ms.median"),
+        ("Stability median", "summary.stability_ms.median"),
+        ("Final quality median", "summary.quality_ms.median"),
+        ("RGA crop median", "summary.crop_ms.median"),
+        ("Transform median", "summary.transform_ms.median"),
+        ("OCR median", "summary.ocr_ms.median"),
+        ("Structured fields median", "summary.structured_ms.median"),
     )
     rows = []
     for label, path in candidates:

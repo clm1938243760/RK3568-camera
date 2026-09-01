@@ -113,6 +113,9 @@ body.text-only .textOnlyHidden{display:none!important}
   <div id="settings">
     <label class="settingRow"><span>网页视角</span><select id="displayRotation"><option value="0">0°（当前方向）</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></label>
     <label class="settingRow"><span>OCR 视角</span><select id="ocrRotation"><option value="0">0°（当前方向）</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></label>
+    <label class="settingRow"><span>识别区上边界</span><input id="regionTop" type="number" min="0" max="99" step="0.1" inputmode="decimal"></label>
+    <label class="settingRow"><span>识别区下边界</span><input id="regionBottom" type="number" min="1" max="100" step="0.1" inputmode="decimal"></label>
+    <label class="settingRow"><span>校正图长边</span><input id="ocrLongSide" type="number" min="256" max="8192" step="16" inputmode="numeric"></label>
     <label class="settingRow textOnlyHidden"><span>目标字符数</span><input id="matchLength" type="number" min="1" max="64" step="1" inputmode="numeric"></label>
     <label class="settingRow textOnlyHidden"><span>字符类型</span><select id="matchCharset"><option value="alphanumeric">字母 + 数字</option><option value="digits">纯数字</option></select></label>
     <label class="settingRow textOnlyHidden"><span>患者查询</span><span class="settingToggle"><input id="patientQueryEnabled" type="checkbox"><span>生成JSON</span></span></label>
@@ -143,6 +146,9 @@ const settingsButton=document.getElementById("settingsButton");
 const settings=document.getElementById("settings");
 const displayRotation=document.getElementById("displayRotation");
 const ocrRotation=document.getElementById("ocrRotation");
+const regionTop=document.getElementById("regionTop");
+const regionBottom=document.getElementById("regionBottom");
+const ocrLongSide=document.getElementById("ocrLongSide");
 const matchLength=document.getElementById("matchLength");
 const matchCharset=document.getElementById("matchCharset");
 const patientQueryEnabled=document.getElementById("patientQueryEnabled");
@@ -175,6 +181,9 @@ function applyDisplayRotation(value){
 function fillConfig(config){
   displayRotation.value=String(config.display_rotation??0);
   ocrRotation.value=String(config.ocr_rotation??0);
+  regionTop.value=String(((config.recognition_region?.top??0.13)*100).toFixed(1));
+  regionBottom.value=String(((config.recognition_region?.bottom??0.60)*100).toFixed(1));
+  ocrLongSide.value=String(config.recognition_region?.canonical_long_side??3200);
   matchLength.value=String(config.match?.length??16);
   matchCharset.value=config.match?.charset||"alphanumeric";
   patientQueryEnabled.checked=textOnly?false:Boolean(config.patient_query_enabled);
@@ -195,6 +204,11 @@ async function loadConfig(){
 async function persistConfig(){
   const length=Number(matchLength.value);
   if(!Number.isInteger(length)||length<1||length>64){settingsMessage.textContent="目标字符数必须是 1 至 64 的整数";return;}
+  const top=Number(regionTop.value)/100;
+  const bottom=Number(regionBottom.value)/100;
+  const longSide=Number(ocrLongSide.value);
+  if(!Number.isFinite(top)||!Number.isFinite(bottom)||top<0||bottom>1||top>=bottom){settingsMessage.textContent="识别区边界必须满足 0 ≤ 上边界 < 下边界 ≤ 100";return;}
+  if(!Number.isInteger(longSide)||longSide<256||longSide>8192){settingsMessage.textContent="校正图长边必须是 256 至 8192 的整数";return;}
   saveSettings.disabled=true;
   settingsMessage.textContent="正在保存并重启识别服务";
   try{
@@ -205,6 +219,7 @@ async function persistConfig(){
       body:JSON.stringify({
         display_rotation:Number(displayRotation.value),
         ocr_rotation:Number(ocrRotation.value),
+        recognition_region:{top:top,bottom:bottom,canonical_long_side:longSide},
         match:{length:length,charset:matchCharset.value},
         patient_query_enabled:textOnly?false:patientQueryEnabled.checked,
         auto_entry_enabled:textOnly?false:autoEntryEnabled.checked
@@ -271,7 +286,11 @@ function unrotatePoint(x,y,rotation){
 
 function paperPoint(x,y,source){
   const corners=source.paper_corners;
-  const [u,v]=unrotatePoint(x,y,source.ocr_rotation||0);
+  const crop=source.recognition_region?.crop_normalized;
+  const top=Array.isArray(crop)&&crop.length===4?Number(crop[1]):0;
+  const bottom=Array.isArray(crop)&&crop.length===4?Number(crop[3]):1;
+  const documentY=top+y*(bottom-top);
+  const [u,v]=unrotatePoint(x,documentY,source.ocr_rotation||0);
   const weights=[(1-u)*(1-v),u*(1-v),u*v,(1-u)*v];
   const sx=canvas.width/(source.frame_size?.width||canvas.width);
   const sy=canvas.height/(source.frame_size?.height||canvas.height);
@@ -821,6 +840,25 @@ def _full_text_document(payload: Any, expected_capture_id: str) -> Dict[str, Any
     selected_frame_sha256 = str(source.get("selected_frame_sha256") or "")
     if re.fullmatch(r"[0-9a-f]{64}", selected_frame_sha256) is None:
         selected_frame_sha256 = ""
+    recognition_region = source.get("recognition_region")
+    crop_normalized = (
+        recognition_region.get("crop_normalized")
+        if isinstance(recognition_region, dict)
+        else None
+    )
+    if not isinstance(crop_normalized, list) or len(crop_normalized) != 4:
+        crop_normalized = [0.0, 0.0, 1.0, 1.0]
+    else:
+        crop_normalized = [_number(value, -1.0) for value in crop_normalized]
+        if (
+            crop_normalized[0] < 0.0
+            or crop_normalized[1] < 0.0
+            or crop_normalized[2] > 1.0
+            or crop_normalized[3] > 1.0
+            or crop_normalized[0] >= crop_normalized[2]
+            or crop_normalized[1] >= crop_normalized[3]
+        ):
+            crop_normalized = [0.0, 0.0, 1.0, 1.0]
     return {
         "available": True,
         "status": str(payload.get("status")),
@@ -830,6 +868,7 @@ def _full_text_document(payload: Any, expected_capture_id: str) -> Dict[str, Any
             "paper_corners": corners,
             "ocr_rotation": rotation,
             "ocr_document_long_side": max(0, int(_number(source.get("ocr_document_long_side")))),
+            "recognition_region": {"crop_normalized": crop_normalized},
             "selected_frame_sha256": selected_frame_sha256,
         },
         "image_size": {"width": image_width, "height": image_height},
@@ -968,6 +1007,28 @@ def _write_text_atomic(path: Path, content: str, mode: int = 0o644) -> None:
     temporary.replace(path)
 
 
+def _merge_environment_atomic(path: Path, updates: Dict[str, str]) -> None:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        lines = []
+    output = []
+    written = set()
+    for line in lines:
+        stripped = line.strip()
+        key = stripped.split("=", 1)[0].strip() if "=" in stripped else ""
+        if key not in updates:
+            output.append(line)
+            continue
+        if key not in written:
+            output.append("%s=%s" % (key, updates[key]))
+            written.add(key)
+    for key, value in updates.items():
+        if key not in written:
+            output.append("%s=%s" % (key, value))
+    _write_text_atomic(path, "\n".join(output) + "\n", 0o600)
+
+
 def _patient_envelope(
     code: str,
     message: str,
@@ -1102,6 +1163,33 @@ class CaptureConfigurationStore:
         patient_query_enabled_at = 0.0
         auto_entry_enabled = False
         auto_entry_enabled_at = 0.0
+        recognition_top = 0.13
+        recognition_bottom = 0.60
+        canonical_long_side = 3200
+        try:
+            environment = {}
+            for raw_line in self.trigger_environment_path.read_text(encoding="utf-8").splitlines():
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                environment[key.strip()] = value.strip()
+            candidate_top = float(environment.get("OCR_REGION_TOP", recognition_top))
+            candidate_bottom = float(
+                environment.get("OCR_REGION_BOTTOM", recognition_bottom)
+            )
+            candidate_long_side = int(
+                environment.get("OCR_DOCUMENT_LONG_SIDE", canonical_long_side)
+            )
+            if (
+                0.0 <= candidate_top < candidate_bottom <= 1.0
+                and 256 <= candidate_long_side <= 8192
+            ):
+                recognition_top = candidate_top
+                recognition_bottom = candidate_bottom
+                canonical_long_side = candidate_long_side
+        except (OSError, ValueError):
+            pass
         try:
             payload = json.loads(self.settings_path.read_text(encoding="utf-8"))
             if isinstance(payload, dict):
@@ -1111,7 +1199,7 @@ class CaptureConfigurationStore:
                 stored_ocr_rotation = _validated_rotation(
                     payload.get("ocr_rotation"), "ocr_rotation"
                 )
-                if payload.get("version") in {2, 3}:
+                if payload.get("version") in {2, 3, 4}:
                     display_rotation = stored_display_rotation
                     ocr_rotation = stored_ocr_rotation
                 else:
@@ -1140,6 +1228,22 @@ class CaptureConfigurationStore:
                         )
                     ),
                 )
+                recognition_region = payload.get("recognition_region")
+                if isinstance(recognition_region, dict):
+                    candidate_top = _number(recognition_region.get("top", recognition_top))
+                    candidate_bottom = _number(recognition_region.get("bottom", recognition_bottom))
+                    candidate_long_side = recognition_region.get(
+                        "canonical_long_side", canonical_long_side
+                    )
+                    if (
+                        0.0 <= candidate_top < candidate_bottom <= 1.0
+                        and isinstance(candidate_long_side, int)
+                        and not isinstance(candidate_long_side, bool)
+                        and 256 <= candidate_long_side <= 8192
+                    ):
+                        recognition_top = candidate_top
+                        recognition_bottom = candidate_bottom
+                        canonical_long_side = candidate_long_side
         except (OSError, ValueError, json.JSONDecodeError):
             pass
 
@@ -1158,6 +1262,11 @@ class CaptureConfigurationStore:
             "patient_query_enabled_at": patient_query_enabled_at,
             "auto_entry_enabled": auto_entry_enabled,
             "auto_entry_enabled_at": auto_entry_enabled_at,
+            "recognition_region": {
+                "top": recognition_top,
+                "bottom": recognition_bottom,
+                "canonical_long_side": canonical_long_side,
+            },
             "forward_to_gateway": auto_entry_enabled,
             "forwarding_enabled_at": auto_entry_enabled_at,
         }
@@ -1185,6 +1294,23 @@ class CaptureConfigurationStore:
         )
         if not isinstance(auto_entry_enabled, bool):
             raise ValueError("auto_entry_enabled must be a boolean")
+        recognition_region = payload.get(
+            "recognition_region",
+            {"top": 0.13, "bottom": 0.60, "canonical_long_side": 3200},
+        )
+        if not isinstance(recognition_region, dict):
+            raise ValueError("recognition_region must be a JSON object")
+        recognition_top = _number(recognition_region.get("top"))
+        recognition_bottom = _number(recognition_region.get("bottom"))
+        canonical_long_side = recognition_region.get("canonical_long_side")
+        if not 0.0 <= recognition_top < recognition_bottom <= 1.0:
+            raise ValueError("recognition region boundaries are invalid")
+        if (
+            isinstance(canonical_long_side, bool)
+            or not isinstance(canonical_long_side, int)
+            or not 256 <= canonical_long_side <= 8192
+        ):
+            raise ValueError("canonical_long_side must be an integer from 256 to 8192")
 
         rules_payload = {
             "enabled": True,
@@ -1215,7 +1341,7 @@ class CaptureConfigurationStore:
             elif not auto_entry_enabled:
                 auto_entry_enabled_at = 0.0
             settings_payload = {
-                "version": 3,
+                "version": 4,
                 "rotation_reference": "current_orientation_zero",
                 "display_rotation": display_rotation,
                 "ocr_rotation": ocr_rotation,
@@ -1223,12 +1349,18 @@ class CaptureConfigurationStore:
                 "patient_query_enabled_at": patient_query_enabled_at,
                 "auto_entry_enabled": auto_entry_enabled,
                 "auto_entry_enabled_at": auto_entry_enabled_at,
+                "recognition_region": {
+                    "top": recognition_top,
+                    "bottom": recognition_bottom,
+                    "canonical_long_side": canonical_long_side,
+                },
                 "forward_to_gateway": auto_entry_enabled,
                 "forwarding_enabled_at": auto_entry_enabled_at,
                 "updated_at": now,
             }
             restart_required = (
                 current.get("ocr_rotation") != ocr_rotation
+                or current.get("recognition_region") != settings_payload["recognition_region"]
                 or current.get("match") != {"length": length, "charset": charset}
             )
             _write_text_atomic(
@@ -1239,9 +1371,14 @@ class CaptureConfigurationStore:
                 self.rules_path,
                 json.dumps(rules_payload, ensure_ascii=False, indent=2) + "\n",
             )
-            _write_text_atomic(
+            _merge_environment_atomic(
                 self.trigger_environment_path,
-                "OCR_ROTATION=%d\n" % ((OCR_BASE_ROTATION + ocr_rotation) % 360),
+                {
+                    "OCR_ROTATION": str((OCR_BASE_ROTATION + ocr_rotation) % 360),
+                    "OCR_REGION_TOP": "%.6f" % recognition_top,
+                    "OCR_REGION_BOTTOM": "%.6f" % recognition_bottom,
+                    "OCR_DOCUMENT_LONG_SIDE": str(canonical_long_side),
+                },
             )
             if self.restart_trigger is not None and restart_required:
                 self.restart_trigger()

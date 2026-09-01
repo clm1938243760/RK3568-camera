@@ -1,85 +1,112 @@
-# RK3568 Camera Recognition Port
+# RK3568 Native Camera Recognition
 
-这是从 RK3588 相机识别链路拆出的独立 RK3568 迁移工作仓库。当前目标是先在
-ATK-DLRK3568 上复现相同的纸张检测、两帧选优、透视校正和全文 OCR，再用同一
-样本和同一参数测出与 RK3588 的真实耗时差。
+本仓库把申请单从进入相机画面到生成结构化字段的链路迁移到 ATK-DLRK3568。
+当前原生候选已在板端运行；HID、SPI 屏幕、虚拟打印机、MSC 和报告上传不在本仓库范围内。
 
-当前状态是“已完成板端依赖准备，等待 RK3568 真机识别验证”，不是已经完成性能验收。
+## 当前链路
 
-## 基线来源
+```text
+IMX415 / RKISP 3840x2160 NV12
+  -> V4L2 MMAP + DMA-BUF 四缓冲
+  -> RGA 缩放为 256x256 BGR
+  -> DocAligner FP16 RKNN 纸张检测
+  -> 空闲 5 FPS、候选 15 FPS 自适应检测
+  -> 四个不同帧且跨度 >= 180 ms 确认稳定
+  -> 只锁定最后一张稳定帧
+  -> 单次最终帧质量检查
+  -> RGA 裁纸张包围框
+  -> 单个组合矩阵完成拉正、旋转、长边 3200 和大区域裁剪
+  -> 1175x1504 RGB 内存图
+  -> PP-OCRv4 Mobile FP16 RKNN 全文 OCR，Batch 1
+  -> 网页字段规则生成结构化字段
+  -> 必填字段、置信度和冲突校验
+```
 
-- 上层识别代码来自 RK3588-camera 提交
-  795c0c76e3ea065366f0478e47862cb4704326a3。
-- DocAligner 模型及其 SHA-256 保持不变，在 RK3568 上使用 ONNX Runtime CPU。
-- RK3568 已有 rk3568-ppocr.service，HTTP 契约为
-  POST http://127.0.0.1:5002/ocr。
-- 已知帧服务为 rk3568-patient-frame.service，默认接口为
-  http://127.0.0.1:8090/api/frame.jpg?quality=95。
-- 预检已确认 `/dev/video9` 和 `/dev/video10` 属于 USB Composite Camera，
-  现有帧服务实际使用 `/dev/video9`，输出 1280x720 MJPEG，约 25.74 FPS。
+主路径不生成 JPEG，不经过 HTTP/Base64，不采集备选图，不选图，不重拍，也不执行
+第二次 OCR。质量或字段校验失败后，本轮锁定失败状态，直到纸张连续移除 0.5 秒。
 
-## 数据链路
+## 已选模型
 
-    RK3568 帧服务 :8090
-      -> HTTP JPEG 快照桥接，5 FPS 原子轮转文件
-      -> DocAligner ONNX Runtime CPU 纸张检测
-      -> 稳定 0.5 秒
-      -> 连续采集 2 帧并选择最佳画面
-      -> 透视校正，目标长边 3200
-      -> RK3568 PP-OCR :5002，串行单 NPU
-      -> schema-v2 全文结果
-      -> 8894 监看页和无敏感字段的耗时记录
+| 模型 | 输入 | 精度 | 用途 |
+| --- | --- | --- | --- |
+| DocAligner | `256x256` | FP16 RKNN | 纸张四角检测 |
+| PP-OCRv4 det | `480x480` | FP16 RKNN | 大区域文字检测 |
+| PP-OCRv4 rec | `48x320` | FP16 RKNN | 逐行文字识别 |
 
-首轮参数故意与 RK3588 一致，用于公平比较。得到基线后，才能单独测试
-1920 长边、ROI 缩小或降低采集分辨率等优化。
+RK3568 只有一个 NPU 核心，两个 OCR 模型串行复用该核心，全部使用 Batch 1。候选
+`384x480` 检测模型虽然发现更多文字框，但结构化结果出现冲突且更慢，因此未采用。
 
-## 仓库结构
+## 目录
 
 | 路径 | 用途 |
 | --- | --- |
-| camera_ocr_overlay.py | RK3568 品牌和路径的 8894 监看服务 |
-| report_parser/ | DocAligner、两帧选优、透视校正和全文 OCR 上层代码 |
-| scripts/rk3568_snapshot_bridge.py | 将现有 HTTP JPEG 转成识别器所需的轮转快照 |
-| scripts/benchmark_ocr_http.py | 同一脱敏 JPEG 的 PP-OCR 固定样本基准 |
-| scripts/collect_e2e_timings.py | 纸张出现到结果生成的现场全流程采样 |
-| scripts/compare_benchmarks.py | RK3588 与 RK3568 结果对比 |
-| scripts/rk3568_preflight.sh | 只读检查摄像头、NPU、运行库和服务 |
-| systemd/ | 三个独立的 RK3568 相机识别服务 |
+| `native/` | V4L2、RGA、RKNN、稳定状态机、图像变换和 OCR C++ 实现 |
+| `report_parser/scripts/native_structured_worker.py` | 事件驱动字段结构化 worker |
+| `config/native.env.example` | 原生服务模型、设备和运行库路径 |
+| `systemd/rk3568-camera-native-*.service` | 原生流水线与结构化服务 |
+| `scripts/install_native_pipeline.sh` | 只安装、激活和回滚 |
+| `scripts/collect_e2e_timings.py` | 不记录患者值的现场逐阶段耗时采集 |
+| `docs/PORTING_PLAN.md` | 实施边界与验收门槛 |
+| `docs/NATIVE_PIPELINE_RESULTS.md` | 模型 A/B 与固定图结果 |
 
-解析器内部 Python 包名暂时保留 rk3588_report_parser，以保持行为和测试
-基线不变；它只是兼容命名，不代表调用 RK3588 专用运行库。
+## 部署
 
-## 安全部署
+默认只安装文件，不切换当前服务：
 
-先执行只读预检：
+```bash
+sudo env \
+  DOCALIGNER_RKNN_SOURCE=/tmp/docaligner_rk3568_uint8_fp16.rknn \
+  PPOCR_DET_RKNN_SOURCE=/tmp/ppocrv4_det_480x480_fp16.rknn \
+  NATIVE_BINARY_SOURCE=/tmp/rk3568_native_pipeline_service \
+  bash scripts/install_native_pipeline.sh
+```
 
-    bash scripts/rk3568_preflight.sh
+通过板端检查后激活：
 
-安装文件但不启用、不启动服务：
+```bash
+sudo env \
+  DOCALIGNER_RKNN_SOURCE=/tmp/docaligner_rk3568_uint8_fp16.rknn \
+  PPOCR_DET_RKNN_SOURCE=/tmp/ppocrv4_det_480x480_fp16.rknn \
+  NATIVE_BINARY_SOURCE=/tmp/rk3568_native_pipeline_service \
+  bash scripts/install_native_pipeline.sh --activate
+```
 
-    sudo apt-get install -y python3-opencv python3-numpy
-    sudo bash install.sh --bootstrap-python
+板端从源码编译时默认单线程，避免 2 GB 内存设备并行编译 Rockchip OCR 源码时 OOM：
 
-确认 /var/lib/rk3568-camera/camera.env 中的帧接口、方向和裁剪范围后再激活：
+```bash
+sudo NATIVE_BUILD_JOBS=1 bash scripts/install_native_pipeline.sh --build
+```
 
-    sudo bash install.sh --activate
+回滚到原 JPEG 快照桥与 Python 触发器：
 
-安装器不会修改或重启既有的帧服务、PP-OCR、网关、USB gadget、打印或
-MSC 服务。监看页使用 http://BOARD_IP:8894/，不会占用 RK3588 的 8893。
-Debian 的 OpenCV 3.2 负责 JPEG 和图像处理；固定版本的 ONNX Runtime 1.14.0
-负责 DocAligner 推理，因此不依赖 OpenCV 的 ONNX DNN 支持。
+```bash
+sudo bash scripts/install_native_pipeline.sh --rollback
+```
 
-## 性能比较
+## 运行状态
 
-固定样本和现场全流程必须分别测量。完整命令见
-[基准协议](docs/BENCHMARK_PROTOCOL.md)，迁移顺序见
-[迁移计划](docs/PORTING_PLAN.md)。
+```bash
+systemctl status rk3568-camera-native-pipeline.service --no-pager -l
+systemctl status rk3568-camera-native-structured.service --no-pager -l
+curl -sS http://127.0.0.1:8894/
+```
+
+公开状态文件为 `0644`，不含 OCR 原文和患者字段值。OCR 全文、结构化字段和固定
+测试图均限制为 root `0600`，并被 Git 忽略。
 
 ## 本地检查
 
-    python -m py_compile camera_ocr_overlay.py scripts\*.py
-    python scripts\check_python37_syntax.py
-    python -m unittest discover -s tests -v
+```powershell
+python scripts/check_python37_syntax.py
+python -m unittest discover -s tests -v
+$env:PYTHONPATH = "report_parser/src"
+python -m unittest report_parser.tests.test_native_structured_worker -v
+```
 
-    $env:PYTHONPATH = "report_parser/src"
-    python -m unittest discover -s report_parser/tests -v
+C++ 测试在 RK3568 上执行：
+
+```bash
+cmake -S native -B native-build -DCMAKE_BUILD_TYPE=Release
+cmake --build native-build -- -j1
+cd native-build && ctest --output-on-failure
+```

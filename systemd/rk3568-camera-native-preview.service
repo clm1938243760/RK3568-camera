@@ -1,0 +1,26 @@
+[Unit]
+Description=RK3568 native RKISP MPP JPEG preview
+After=local-fs.target
+Before=rk3568-camera-native-pipeline.service rk3568-camera-ocr-overlay.service
+
+[Service]
+Type=notify
+NotifyAccess=main
+TimeoutStartSec=10
+Environment=NATIVE_PREVIEW_DEVICE=/dev/video1
+Environment=NATIVE_PREVIEW_PORT=8092
+Environment=NATIVE_PREVIEW_WIDTH=1920
+Environment=NATIVE_PREVIEW_HEIGHT=1080
+Environment=NATIVE_PREVIEW_SOURCE_FPS=30
+Environment=NATIVE_PREVIEW_FPS=5
+EnvironmentFile=-/var/lib/rk3568-camera/native.env
+ExecStart=/usr/bin/python3 /opt/rk3568_camera/scripts/native_preview_server.py --device ${NATIVE_PREVIEW_DEVICE} --host 127.0.0.1 --port ${NATIVE_PREVIEW_PORT} --width ${NATIVE_PREVIEW_WIDTH} --height ${NATIVE_PREVIEW_HEIGHT} --source-fps ${NATIVE_PREVIEW_SOURCE_FPS} --preview-fps ${NATIVE_PREVIEW_FPS}
+Restart=always
+RestartSec=2
+User=root
+Group=root
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

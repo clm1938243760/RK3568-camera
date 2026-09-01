@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "platform": "rk3568",
+  "status": "candidate_validated",
+  "capture": {
+    "sensor": "imx415",
+    "device": "/dev/video0",
+    "pixel_format": "NV12",
+    "width": 3840,
+    "height": 2160,
+    "buffer_count": 4,
+    "transport": "v4l2_mmap_dmabuf"
+  },
+  "pipeline": {
+    "idle_detection_fps": 5,
+    "tracking_detection_fps": 15,
+    "minimum_stable_observations": 4,
+    "minimum_stable_span_ms": 180,
+    "final_frame_count": 1,
+    "retry_count": 0,
+    "canonical_long_side": 3200,
+    "canonical_short_side": 1176,
+    "recognition_region": [0.0, 0.13, 1.0, 0.6],
+    "ocr_batch": 1
+  },
+  "models": {
+    "docaligner": {
+      "input": [1, 256, 256, 3],
+      "precision": "fp16",
+      "sha256": "7731b46bc8c4b4d8088cbbe3b341398cb0f4f2500cebab3175a94e9f19d71fc3"
+    },
+    "ppocr_detection": {
+      "input": [1, 480, 480, 3],
+      "precision": "fp16",
+      "sha256": "30b86741883bc2dfa0a5c88673ae36674d36ad5263e564867e5e878c507646ee"
+    },
+    "ppocr_recognition": {
+      "input": [1, 48, 320, 3],
+      "precision": "fp16",
+      "batch": 1
+    }
+  },
+  "validation": {
+    "fixed_fixture_hot_runs": 20,
+    "fixed_fixture_structured_status": "accepted",
+    "fixed_fixture_field_count": 8,
+    "rollback_rehearsed": true,
+    "live_paper_cycles": 0,
+    "idle_stream_minutes": 10
+  }
+}
