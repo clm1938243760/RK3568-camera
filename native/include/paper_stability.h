@@ -21,7 +21,7 @@ struct StabilityConfig {
     double minimum_iou = 0.90;
     double maximum_center_shift_ratio = 0.03;
     double maximum_area_change_ratio = 0.15;
-    std::uint64_t removal_span_ns = 500000000ULL;
+    std::uint64_t removal_span_ns = 1500000000ULL;
 };
 
 struct StabilityUpdate {
@@ -83,4 +83,3 @@ private:
 }  // namespace rk3568_camera
 
 #endif  // RK3568_CAMERA_PAPER_STABILITY_H_
-

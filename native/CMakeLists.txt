@@ -67,6 +67,7 @@ add_library(rk3568_pipeline_core STATIC
     src/document_transform.cc
     src/frame_quality.cc
     src/npu_frequency_guard.cc
+    src/paper_detection_orientation.cc
     src/paper_stability.cc
     src/structured_feedback.cc
 )

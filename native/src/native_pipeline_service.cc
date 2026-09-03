@@ -3,6 +3,7 @@
 #include "document_transform.h"
 #include "frame_quality.h"
 #include "npu_frequency_guard.h"
+#include "paper_detection_orientation.h"
 #include "paper_stability.h"
 #include "ppocr_engine.h"
 #include "rga_preprocessor.h"
@@ -93,6 +94,21 @@ rk3568_camera::DocumentTransformConfig LoadTransformConfig() {
         throw std::invalid_argument("invalid document transform configuration");
     }
     return config;
+}
+
+cv::Mat RotateDetectorInput(const cv::Mat& input, int clockwise_degrees) {
+    if (clockwise_degrees == 0) return input;
+    cv::Mat rotated;
+    if (clockwise_degrees == 90) {
+        cv::rotate(input, rotated, cv::ROTATE_90_CLOCKWISE);
+    } else if (clockwise_degrees == 180) {
+        cv::rotate(input, rotated, cv::ROTATE_180);
+    } else if (clockwise_degrees == 270) {
+        cv::rotate(input, rotated, cv::ROTATE_90_COUNTERCLOCKWISE);
+    } else {
+        throw std::invalid_argument("invalid PAPER_DETECTOR_ROTATION");
+    }
+    return rotated;
 }
 
 void AppendRecognitionConfig(std::ostringstream& output) {
@@ -219,11 +235,11 @@ void AppendDetection(std::ostringstream& output,
                      const rk3568_camera::PaperDetection* detection) {
     const bool present = detection != nullptr && detection->detected;
     output << ",\"paper_detected\":" << (present ? "true" : "false")
-           << ",\"paper_confidence\":" << (present ? detection->confidence : 0.0F)
-           << ",\"paper_inference_ms\":" << (present ? detection->inference_ms : 0.0)
+           << ",\"paper_confidence\":" << (detection ? detection->confidence : 0.0F)
+           << ",\"paper_inference_ms\":" << (detection ? detection->inference_ms : 0.0)
            << ",\"frame_size\":{\"width\":"
-           << (present ? detection->frame_width : 3840)
-           << ",\"height\":" << (present ? detection->frame_height : 2160)
+           << (detection ? detection->frame_width : 3840)
+           << ",\"height\":" << (detection ? detection->frame_height : 2160)
            << "},\"paper_corners\":[";
     if (present) {
         for (std::size_t index = 0; index < detection->corners.size(); ++index) {
@@ -412,6 +428,11 @@ int main(int argc, char** argv) {
 
     try {
         g_transform_config = LoadTransformConfig();
+        const int detector_rotation = EnvironmentInteger(
+            "PAPER_DETECTOR_ROTATION", 90, 0, 270);
+        if (detector_rotation % 90 != 0) {
+            throw std::invalid_argument("PAPER_DETECTOR_ROTATION must be 0, 90, 180, or 270");
+        }
         rk3568_camera::DocAlignerRknn detector(
             argv[1], 0.5F, rk3568_camera::DocAlignerInputMode::kUint8);
         rk3568_camera::PpOcrEngine ocr(argv[2], argv[3]);
@@ -464,7 +485,13 @@ int main(int argc, char** argv) {
                     continue;
                 }
                 cv::Mat detector_input = rga.ResizeNv12ToBgr(frame, 256, 256);
-                detection = detector.DetectBgr(detector_input, frame.width, frame.height);
+                detector_input = RotateDetectorInput(detector_input, detector_rotation);
+                const bool swaps_axes = detector_rotation == 90 || detector_rotation == 270;
+                detection = detector.DetectBgr(
+                    detector_input, swaps_axes ? frame.height : frame.width,
+                    swaps_axes ? frame.width : frame.height);
+                detection = rk3568_camera::RemapDetectionFromClockwiseRotation(
+                    detection, frame.width, frame.height, detector_rotation);
                 rk3568_camera::StabilityUpdate stability;
                 if (detection.detected) {
                     stability = tracker.UpdatePresent(frame.sequence, frame.timestamp_ns, detection);
@@ -514,7 +541,7 @@ int main(int argc, char** argv) {
                                 StagePayload(stage, stability.reason, frame.sequence,
                                              stability.observations,
                                              stability.stable_span_ns / 1000000.0,
-                                             detection.detected ? &detection : nullptr,
+                                             &detection,
                                              active_capture_id),
                                 0644);
                     capture.Requeue(frame);

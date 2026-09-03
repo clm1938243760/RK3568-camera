@@ -1,8 +1,10 @@
 #include "paper_stability.h"
 #include "detection_cadence.h"
+#include "paper_detection_orientation.h"
 #include "structured_feedback.h"
 
 #include <cassert>
+#include <cmath>
 #include <iostream>
 
 void RunDocumentTransformTests();
@@ -52,8 +54,8 @@ void TestLockedUntilRemoval() {
     assert(tracker.UpdatePresent(4, 210000000ULL, Detection()).triggered);
     assert(!tracker.UpdatePresent(5, 280000000ULL, Detection()).triggered);
     assert(!tracker.UpdateMissing(6, 350000000ULL).rearmed);
-    assert(!tracker.UpdateMissing(7, 800000000ULL).rearmed);
-    assert(tracker.UpdateMissing(8, 850000000ULL).rearmed);
+    assert(!tracker.UpdateMissing(7, 1800000000ULL).rearmed);
+    assert(tracker.UpdateMissing(8, 1850000000ULL).rearmed);
     assert(tracker.state() == rk3568_camera::PaperState::kAbsent);
 }
 
@@ -86,8 +88,36 @@ void TestReappearanceCancelsRemovalCountdown() {
     tracker.UpdateMissing(5, 300000000ULL);
     tracker.UpdatePresent(6, 750000000ULL, Detection());
     assert(!tracker.UpdateMissing(7, 850000000ULL).rearmed);
-    assert(!tracker.UpdateMissing(8, 1300000000ULL).rearmed);
-    assert(tracker.UpdateMissing(9, 1350000000ULL).rearmed);
+    assert(!tracker.UpdateMissing(8, 2300000000ULL).rearmed);
+    assert(tracker.UpdateMissing(9, 2350000000ULL).rearmed);
+}
+
+void TestClockwiseDetectionRemap() {
+    rk3568_camera::PaperDetection rotated;
+    rotated.detected = true;
+    rotated.confidence = 0.84F;
+    rotated.frame_width = 600;
+    rotated.frame_height = 1000;
+    rotated.corners = {{{100.0F, 100.0F},
+                        {500.0F, 100.0F},
+                        {500.0F, 900.0F},
+                        {100.0F, 900.0F}}};
+    const auto original = rk3568_camera::RemapDetectionFromClockwiseRotation(
+        rotated, 1000, 600, 90);
+    assert(original.frame_width == 1000);
+    assert(original.frame_height == 600);
+    assert(original.confidence == rotated.confidence);
+    const auto near = [](float actual, float expected) {
+        return std::abs(actual - expected) < 0.01F;
+    };
+    assert(near(original.corners[0].x, 100.0F) &&
+           near(original.corners[0].y, 100.0F));
+    assert(near(original.corners[1].x, 900.0F) &&
+           near(original.corners[1].y, 100.0F));
+    assert(near(original.corners[2].x, 900.0F) &&
+           near(original.corners[2].y, 500.0F));
+    assert(near(original.corners[3].x, 100.0F) &&
+           near(original.corners[3].y, 500.0F));
 }
 
 void TestStructuredFeedbackProtocol() {
@@ -112,6 +142,7 @@ int main() {
     TestLockedUntilRemoval();
     TestCadenceWithMicrosecondCameraTimestamps();
     TestReappearanceCancelsRemovalCountdown();
+    TestClockwiseDetectionRemap();
     TestStructuredFeedbackProtocol();
     std::cout << "paper stability tests passed\n";
     return 0;
