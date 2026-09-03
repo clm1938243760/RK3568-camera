@@ -161,6 +161,32 @@ class CameraOverlayConfigurationTest(unittest.TestCase):
             MODULE.PAGE,
         )
 
+    def test_display_state_maps_native_pipeline_stages(self):
+        cases = (
+            ("waiting_paper", "absent", "wait_scan"),
+            ("detecting_stability", "tracking", "report_detecting"),
+            ("checking_quality", "locked", "report_detecting"),
+            ("ocr_running", "ocr_primary", "report_detecting"),
+            ("structuring", "structuring", "report_detecting"),
+            ("structured_complete", "completed", "entry_completed"),
+            ("structured_rejected", "reposition_required", "paper_reposition"),
+        )
+        for stage, capture_stage, expected_screen in cases:
+            with self.subTest(stage=stage):
+                payload = MODULE.display_state_payload(
+                    {
+                        "stage": stage,
+                        "capture_stage": capture_stage,
+                        "service_state": "active",
+                    }
+                )
+                self.assertEqual(payload["display"]["screen"], expected_screen)
+
+    def test_normalized_status_preserves_native_stage(self):
+        payload = MODULE.normalize_trigger_status({"stage": "ocr_running"})
+
+        self.assertEqual(payload["stage"], "ocr_running")
+
 
 if __name__ == "__main__":
     unittest.main()

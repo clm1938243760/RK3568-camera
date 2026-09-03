@@ -606,6 +606,7 @@ def normalize_trigger_status(payload: Dict[str, Any]) -> Dict[str, Any]:
         "frame_size": {"width": width, "height": height},
         "paper_corners": corners,
         "state": str(payload.get("state") or "absent")[:48],
+        "stage": str(payload.get("stage") or "")[:64],
         "reason": str(payload.get("reason") or "")[:96],
         "stable_for": round(max(0.0, _number(payload.get("stable_for"))), 3),
         "stable_target_seconds": round(max(0.1, _number(payload.get("stable_target_seconds"), 0.5)), 3),
@@ -631,6 +632,82 @@ def normalize_trigger_status(payload: Dict[str, Any]) -> Dict[str, Any]:
             for key in ("status", "reason", "attempt")
             if key in verification and isinstance(verification[key], (str, int))
         },
+    }
+
+
+def display_state_payload(status: Dict[str, Any]) -> Dict[str, Any]:
+    """Expose camera progress through the existing SPI display API shape."""
+    stage = str(status.get("stage") or "")
+    capture_stage = str(status.get("capture_stage") or "absent")
+    service_state = str(status.get("service_state") or "waiting")
+
+    if service_state == "offline":
+        screen, title, message = (
+            "wait_scan",
+            "识别服务未连接",
+            "正在等待摄像头识别服务",
+        )
+    elif stage == "detecting_stability" or capture_stage == "tracking":
+        screen, title, message = (
+            "report_detecting",
+            "已检测到申请单",
+            "请保持申请单稳定",
+        )
+    elif stage == "checking_quality":
+        screen, title, message = (
+            "report_detecting",
+            "正在采集清晰画面",
+            "请保持申请单稳定",
+        )
+    elif stage == "ocr_running" or capture_stage == "ocr_primary":
+        screen, title, message = (
+            "report_detecting",
+            "正在识别申请单",
+            "全文 OCR 中",
+        )
+    elif stage == "structuring" or capture_stage == "structuring":
+        screen, title, message = (
+            "report_detecting",
+            "正在识别申请单",
+            "生成结构化字段",
+        )
+    elif stage in {"structured_complete", "ocr_complete"} or capture_stage == "completed":
+        screen, title, message = (
+            "entry_completed",
+            "识别完成",
+            "请移除申请单",
+        )
+    elif stage in {"structured_rejected", "ocr_rejected", "quality_rejected", "capture_error"} or capture_stage in {
+        "reposition_required",
+        "burst_rejected",
+        "ocr_error",
+    }:
+        screen, title, message = (
+            "paper_reposition",
+            "申请单识别失败",
+            "请移除并重新摆放申请单",
+        )
+    else:
+        screen, title, message = (
+            "wait_scan",
+            "等待申请单",
+            "请将申请单放入识别区域",
+        )
+
+    return {
+        "display": {
+            "screen": screen,
+            "title": title,
+            "message": message,
+            "progress_text": message,
+            "prompt_text": message,
+            "capture_id": str(status.get("capture_id") or ""),
+            "popup": None,
+            "updated_at": time.time(),
+        },
+        "device_id": "rk3568-camera",
+        "location": "camera",
+        "camera_stage": stage or capture_stage,
     }
 
 
@@ -1921,6 +1998,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/result",
             "/api/patient",
             "/api/frame.jpg",
+            "/display/state",
             "/favicon.ico",
         ):
             print("%s - %s" % (self.address_string(), fmt % args), flush=True)
@@ -1953,6 +2031,9 @@ class Handler(BaseHTTPRequestHandler):
             if self.detector_probe is not None:
                 payload["detector_service"] = self.detector_probe.snapshot()
             self._json(payload)
+            return
+        if path == "/display/state":
+            self._json(display_state_payload(self.cache.snapshot()))
             return
         if path == "/api/frame.jpg":
             try:
